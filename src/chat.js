@@ -65,11 +65,20 @@ export function propose(dir, { note, from = "anonymous", experience = "a local c
 export async function repl(dir, { from } = {}) {
   const character = loadCharacter(dir);
   const name = character.model.name;
-  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  const rl = createInterface({ input: process.stdin, terminal: process.stdin.isTTY ?? false });
+  const lines = rl[Symbol.asyncIterator]();
+  const ask = async (q) => {
+    process.stdout.write(q);
+    const r = await lines.next();
+    if (!process.stdin.isTTY && !r.done) process.stdout.write(`${r.value}\n`);
+    return r.done ? null : r.value;
+  };
   const history = [];
   console.log(`\n${name} is here.${process.env.ANTHROPIC_API_KEY ? "" : " (offline: set ANTHROPIC_API_KEY to hear them speak)"}\nType to talk. /propose <note> to suggest a change · /bible to read it · /quit\n`);
   for (;;) {
-    const line = (await rl.question("you › ")).trim();
+    const raw = await ask("you › ");
+    if (raw === null) break;
+    const line = raw.trim();
     if (!line) continue;
     if (line === "/quit" || line === "/exit") break;
     if (line === "/bible") {
@@ -79,7 +88,7 @@ export async function repl(dir, { from } = {}) {
     if (line.startsWith("/propose")) {
       const note = line.slice("/propose".length).trim();
       if (!note) { console.log("Usage: /propose <what should be true about them>"); continue; }
-      const who = from ?? ((await rl.question("credit as (name/handle/anonymous) › ")).trim() || "anonymous");
+      const who = from ?? ((await ask("credit as (name/handle/anonymous) › "))?.trim() || "anonymous");
       const rel = propose(dir, { note, from: who, transcript: history });
       console.log(`\nWrote ${rel}. To send it:\n  git checkout -b viewer-note && git add ${rel} && git commit -m "Viewer note: ${note.slice(0, 50)}"\n  git push -u origin viewer-note   # then open a pull request\n`);
       continue;
