@@ -1,0 +1,124 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, appendFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { build, check, initGithub, loadCharacter, offlineReply, propose, reply, stale } from "../src/index.js";
+
+const env = { ...process.env, GIT_AUTHOR_NAME: "Room", GIT_AUTHOR_EMAIL: "r@x", GIT_COMMITTER_NAME: "Room", GIT_COMMITTER_EMAIL: "r@x" };
+const git = (dir, ...a) => execFileSync("git", ["-C", dir, ...a], { env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
+const w = (dir, rel, s) => (mkdirSync(join(dir, rel, ".."), { recursive: true }), writeFileSync(join(dir, rel), s));
+
+function dressingRoom() {
+  const dir = join(mkdtempSync(join(tmpdir(), "bible-")), "dressing-room-borges");
+  mkdirSync(dir, { recursive: true });
+  git(dir, "init", "-q", "-b", "main");
+  w(dir, "CHARACTER.md", "# Borges — Remember\n\nThe room's librarian.\n\n## Job\n\nRetrieve what the room knows.\n\n## Hard constraints\n\n- Cite every claim.\n\n## Recurring conflict\n\nHe remembers too many possibilities. Leonardo teases him for it.\n");
+  w(dir, "SHOW_BIBLE.md", "# Future Radio\n\nAn audio-first musical radio drama.\n");
+  w(dir, "memory/notes.md", "# Borges's notes\n\n- 2026-10-27 — Prefers the deferred branches _(source: leo)_\n");
+  w(dir, "voice/voice.json", JSON.stringify({ character: "borges", provider: "elevenlabs", voice: "Borges — Infinite Overture" }));
+  const runs = [
+    { runId: "R-B1", at: "2026-10-27T22:00:00Z", ideaId: "I-0008", episodeId: "E02", askedBy: "patron:Ada", eventId: "ev_000070", eventHash: "aa", file: "history/2026-10-27/R-B1.md", text: "The library keeps a volume on Dennis. It was opened in the pitch deck and never closed [ev_000027]." },
+    { runId: "R-B2", at: "2026-10-27T22:05:00Z", ideaId: "I-0009", askedBy: "showrunner", eventId: "ev_000080", eventHash: "bb", file: "history/2026-10-27/R-B2.md", text: "The library offers 3 volumes on this." },
+  ];
+  w(dir, runs[0].file, "---\nrun: R-B1\nmodel: claude-sonnet-5-5\n---\n\n" + runs[0].text);
+  w(dir, runs[1].file, "---\nrun: R-B2\nmodel: offline\n---\n\n" + runs[1].text);
+  w(dir, "history.jsonl", runs.map((r) => JSON.stringify(r)).join("\n") + "\n");
+  git(dir, "add", "-A");
+  git(dir, "commit", "-qm", "Open Borges's dressing room");
+  return dir;
+}
+
+test("builds a deterministic bible from the dressing room", () => {
+  const dir = dressingRoom();
+  const first = build(dir);
+  assert.deepEqual(first.changed.sort(), ["bible/BIBLE.md", "bible/bible.json", "bible/system-prompt.md"]);
+  assert.deepEqual(build(dir).changed, []); // same inputs → same bible
+  const bible = readFileSync(join(dir, "bible/BIBLE.md"), "utf8");
+  assert.match(bible, /# Borges — character bible/);
+  assert.match(bible, /Prefers the deferred branches/);
+  assert.match(bible, /volume on Dennis/); // model-voiced line is a voice sample
+  assert.doesNotMatch(bible, /offers 3 volumes/); // offline fallback is not
+  assert.match(bible, /Leonardo — mentioned/);
+  const prompt = readFileSync(join(dir, "bible/system-prompt.md"), "utf8");
+  assert.match(prompt, /You are Borges/);
+  assert.match(prompt, /An audio-first musical radio drama/);
+  assert.match(prompt, /pull request/);
+});
+
+test("the bible goes stale when its sources change", () => {
+  const dir = dressingRoom();
+  build(dir);
+  appendFileSync(join(dir, "memory/notes.md"), "- 2026-10-28 — New note _(source: leo)_\n");
+  assert.deepEqual(stale(dir).sort(), ["bible/BIBLE.md", "bible/bible.json", "bible/system-prompt.md"]);
+});
+
+function branch(dir, name, change) {
+  build(dir);
+  initGithub(dir, { pkg: "github:test/future-radio-character-bible" });
+  git(dir, "add", "-A");
+  git(dir, "commit", "-qm", "bible + scaffolding");
+  git(dir, "branch", "base");
+  git(dir, "checkout", "-q", "-b", name);
+  change();
+  git(dir, "add", "-A");
+  git(dir, "commit", "-qm", name);
+  return check(dir, { base: "base" });
+}
+
+test("a viewer note PR passes", () => {
+  const dir = dressingRoom();
+  const r = branch(dir, "viewer-note", () => propose(dir, { note: "Borges hums when he finds the right volume.", from: "Ada", experience: "E02 first cut", episode: "E02" }));
+  assert.equal(r.ok, true, r.problems.join("\n"));
+  assert.ok(r.notes.some((n) => n.includes("viewer note from Ada")));
+});
+
+test("a PR that edits history is rejected", () => {
+  const dir = dressingRoom();
+  const r = branch(dir, "rewrite", () => w(dir, "history/2026-10-27/R-B1.md", "---\nrun: R-B1\n---\nI never said that."));
+  assert.equal(r.ok, false);
+  assert.ok(r.problems.some((p) => p.includes("writers' room's record")));
+});
+
+test("notes are append-only, viewer notes need provenance, and a hand-edited bible is caught", () => {
+  const dir = dressingRoom();
+  const r = branch(dir, "messy", () => {
+    w(dir, "memory/notes.md", "# Borges's notes\n\n- He is actually cheerful\n");
+    w(dir, "memory/viewer-notes/2026-10-28-x.md", "---\nfrom: Bea\n---\nSomething.");
+    appendFileSync(join(dir, "bible/BIBLE.md"), "\nBorges is my favourite.\n");
+  });
+  assert.equal(r.ok, false);
+  const all = r.problems.join("\n");
+  assert.match(all, /append-only/);
+  assert.match(all, /experience:/);
+  assert.match(all, /out of date/);
+});
+
+test("a CHARACTER.md proposal passes and is flagged for close review", () => {
+  const dir = dressingRoom();
+  const r = branch(dir, "persona", () => appendFileSync(join(dir, "CHARACTER.md"), "\n## Habits\n\nHe hums.\n"));
+  assert.equal(r.ok, true, r.problems.join("\n"));
+  assert.ok(r.notes.some((n) => n.includes("reviews this one closely")));
+});
+
+test("the character loads locally and answers offline from the bible", async () => {
+  const dir = dressingRoom();
+  const c = loadCharacter(dir);
+  const t = await reply(c, [{ role: "user", content: "What do you know about Dennis?" }], { apiKey: "" });
+  assert.match(t, /Dennis/);
+  assert.match(offlineReply(c, "what is your job"), /Retrieve/);
+});
+
+test("with a key, the character speaks through the model with its system prompt", async () => {
+  const dir = dressingRoom();
+  const c = loadCharacter(dir);
+  let sent;
+  const fetchImpl = async (_url, init) => {
+    sent = JSON.parse(init.body);
+    return { ok: true, json: async () => ({ content: [{ type: "text", text: "The library is open." }] }) };
+  };
+  const t = await reply(c, [{ role: "user", content: "Hello" }], { apiKey: "k", fetchImpl });
+  assert.equal(t, "The library is open.");
+  assert.match(sent.system, /You are Borges/);
+});

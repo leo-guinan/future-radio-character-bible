@@ -1,0 +1,12 @@
+{
+  "name": "future-radio-character-bible",
+  "version": "0.1.0",
+  "description": "Generate a character bible inside a Future Radio dressing-room repo, load the character locally to talk with, and keep viewer pull requests honest.",
+  "type": "module",
+  "bin": { "character-bible": "bin/character-bible.js" },
+  "exports": { ".": "./src/index.js" },
+  "files": ["bin", "src", "README.md"],
+  "engines": { "node": ">=20" },
+  "scripts": { "test": "node --test test/*.test.js" },
+  "license": "MIT"
+}
