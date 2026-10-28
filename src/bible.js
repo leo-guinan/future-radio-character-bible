@@ -43,8 +43,29 @@ export function frontmatter(md) {
   return { data, body: md.slice(m[0].length) };
 }
 
+/** The folder's path inside its git repo ("" at the root, "extras/yuria/" in a shared repo), or null outside git. */
+export function repoPrefix(dir) {
+  try {
+    return execFileSync("git", ["-C", dir, "rev-parse", "--show-prefix"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+  } catch {
+    return null;
+  }
+}
+
+/** The shared show bible: in the folder itself, or at the top of the repo that holds it. */
+function showBibleFor(dir) {
+  const own = read(dir, "SHOW_BIBLE.md");
+  if (own !== null) return own;
+  try {
+    const top = execFileSync("git", ["-C", dir, "rev-parse", "--show-toplevel"], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
+    return read(top, "SHOW_BIBLE.md");
+  } catch {
+    return null;
+  }
+}
+
 function gitLog(dir, paths) {
-  if (!existsSync(join(dir, ".git"))) return [];
+  if (repoPrefix(dir) === null) return [];
   try {
     const out = execFileSync("git", ["-C", dir, "log", "--format=%cs%x09%an%x09%s", "--", ...paths], { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
     return out ? out.split("\n").map((l) => { const [date, author, subject] = l.split("\t"); return { date, author, subject }; }) : [];
@@ -61,7 +82,9 @@ export function load(dir) {
   try { voiceRaw = JSON.parse(read(dir, "voice/voice.json") ?? "null"); } catch { voiceRaw = null; }
   const fromDir = basename(resolve(dir)).replace(/^(future-radio-)?dressing-room-/, "");
   const slug = String(voiceRaw?.character ?? (fromDir !== basename(resolve(dir)) ? fromDir : character.match(/^#\s+([^\s—–-]+)/m)?.[1] ?? "character")).toLowerCase();
-  const name = slug[0].toUpperCase() + slug.slice(1);
+  // "# The Unspoken Orchestra — Extra" names the character; otherwise the slug does.
+  const heading = character.match(/^#\s+(.+?)\s+[—–]\s+/m)?.[1]?.trim();
+  const name = heading ?? slug[0].toUpperCase() + slug.slice(1);
   const notes = (read(dir, "memory/notes.md") ?? "").split("\n").filter((l) => l.startsWith("- ")).map((l) => l.slice(2).trim());
   const viewerDir = join(dir, "memory/viewer-notes");
   const viewerNotes = existsSync(viewerDir)
@@ -78,7 +101,7 @@ export function load(dir) {
     return { ...entry, model: meta.model ?? "unknown", flagged: !!meta.flags };
   });
   const changelog = gitLog(dir, ["CHARACTER.md", "memory", "voice"]);
-  return { dir, name, slug, character, showBible: read(dir, "SHOW_BIBLE.md"), notes, viewerNotes, voice, runs, changelog };
+  return { dir, name, slug, character, showBible: showBibleFor(dir), notes, viewerNotes, voice, runs, changelog };
 }
 
 /** Sections of CHARACTER.md by "## " heading. */
@@ -178,18 +201,9 @@ export function renderBible(m) {
     "",
     id.intro,
     "",
-    "## Job",
-    "",
-    id.job || "_Not written yet._",
-    "",
-    "## Hard constraints",
-    "",
-    id.constraints || "_None written yet._",
-    "",
-    "## Recurring conflict",
-    "",
-    id.conflict || "_None written yet._",
-    "",
+    ...(id.job ? ["## Job", "", id.job, ""] : []),
+    ...(id.constraints ? ["## Hard constraints", "", id.constraints, ""] : []),
+    ...(id.conflict ? ["## Recurring conflict", "", id.conflict, ""] : []),
   ];
   for (const [k, v] of Object.entries(id.other)) lines.push(`## ${k[0].toUpperCase()}${k.slice(1)}`, "", v, "");
   lines.push("## Canon they carry", "");

@@ -4,7 +4,7 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, appendFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { build, check, initGithub, loadCharacter, offlineReply, propose, reply, stale } from "../src/index.js";
+import { build, check, initGithub, load, loadCharacter, offlineReply, propose, reply, stale } from "../src/index.js";
 
 const env = { ...process.env, GIT_AUTHOR_NAME: "Room", GIT_AUTHOR_EMAIL: "r@x", GIT_COMMITTER_NAME: "Room", GIT_COMMITTER_EMAIL: "r@x" };
 const git = (dir, ...a) => execFileSync("git", ["-C", dir, ...a], { env, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
@@ -137,4 +137,39 @@ test("released appearances are the voice of record and are counted apart from ru
   assert.match(bible, /Released appearances: \*\*E01\*\*/);
   assert.match(bible, /E01, as released/);
   assert.match(readFileSync(join(dir, "bible/system-prompt.md"), "utf8"), /You have appeared in E01/);
+});
+
+test("a character folder inside a shared repo builds and checks on its own", () => {
+  const root = join(mkdtempSync(join(tmpdir(), "extras-")), "future-radio-extras");
+  mkdirSync(root, { recursive: true });
+  git(root, "init", "-q", "-b", "main");
+  w(root, "SHOW_BIBLE.md", "# Future Radio\n\nAn audio-first musical radio drama.\n");
+  for (const [slug, heading] of [["yuria", "Yuria"], ["the-cat", "The cat"]]) {
+    const d = join(root, "extras", slug);
+    w(d, "CHARACTER.md", `# ${heading} — Extra\n\nNo set story yet.\n\n## What we know\n\n- Something.\n\n## What we don't know yet\n\n- Everything else.\n`);
+    w(d, "voice/voice.json", JSON.stringify({ character: slug }));
+    w(d, "memory/notes.md", "# notes\n\n");
+    w(d, "history.jsonl", "");
+  }
+  const yuria = join(root, "extras", "yuria");
+  const { model } = build(yuria);
+  build(join(root, "extras", "the-cat"));
+  assert.equal(model.name, "Yuria");
+  assert.equal(load(join(root, "extras", "the-cat")).name, "The cat");
+  const bible = readFileSync(join(yuria, "bible/BIBLE.md"), "utf8");
+  assert.doesNotMatch(bible, /## Job/); // extras have no job section to leave empty
+  assert.match(bible, /## What we don't know yet/);
+  assert.match(readFileSync(join(yuria, "bible/system-prompt.md"), "utf8"), /An audio-first musical radio drama/); // show bible from the repo top
+  git(root, "add", "-A");
+  git(root, "commit", "-qm", "extras");
+  git(root, "branch", "base");
+  git(root, "checkout", "-q", "-b", "pr");
+  w(join(root, "extras", "the-cat"), "history.jsonl", "tampered\n"); // someone else's history
+  propose(yuria, { note: "She hums the station ident.", from: "Ada", experience: "E10" });
+  git(root, "add", "-A");
+  git(root, "commit", "-qm", "pr");
+  const r = check(yuria, { base: "base" });
+  assert.equal(r.ok, true, r.problems.join("\n")); // Yuria's folder only sees her own change
+  assert.ok(r.changed.every((c) => !c.path.startsWith("extras/")));
+  assert.equal(check(join(root, "extras", "the-cat"), { base: "base" }).ok, false);
 });

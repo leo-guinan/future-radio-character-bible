@@ -33,6 +33,22 @@ last few lines of the conversation — ready to commit and open as a pull reques
 Without an API key the character answers offline, straight from their bible.
 `CHARACTER_MODEL` picks the model (default `claude-sonnet-5-5`).
 
+## Shared repos (extras)
+
+A character doesn't need a repo of their own. Any folder with a \`CHARACTER.md\` works,
+including one inside a bigger repo — the bible reads the show bible from the repo's top,
+and \`check\` only counts changes inside that folder.
+
+```bash
+npx github:leo-guinan/future-radio-character-bible build-each extras
+npx github:leo-guinan/future-radio-character-bible check-each extras --base origin/main
+npx github:leo-guinan/future-radio-character-bible chat extras/yuria
+npx github:leo-guinan/future-radio-character-bible init-extras .
+```
+
+A character folder's \`CHARACTER.md\` can skip Job, Hard constraints and Recurring conflict;
+the bible leaves out sections that aren't written.
+
 ## Pull request rules (`check --base`)
 
 - `history/` and `history.jsonl` belong to the writers' room. Never edited in a PR.

@@ -9,7 +9,7 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { frontmatter, stale } from "./bible.js";
+import { frontmatter, repoPrefix, stale } from "./bible.js";
 
 const git = (dir, args) => execFileSync("git", ["-C", dir, ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }).trim();
 
@@ -27,12 +27,14 @@ export function check(dir, opts = {}) {
 
   if (opts.base) {
     const mergeBase = git(dir, ["merge-base", opts.base, "HEAD"]);
-    changed = git(dir, ["diff", "--name-status", "--no-renames", `${mergeBase}`, "HEAD"])
+    // In a shared repo (extras/yuria/), only this folder's changes count, relative to it.
+    const prefix = repoPrefix(dir) ?? "";
+    changed = git(dir, ["diff", "--name-status", "--no-renames", `${mergeBase}`, "HEAD", "--", "."])
       .split("\n")
       .filter(Boolean)
       .map((l) => {
         const [status, path] = l.split("\t");
-        return { status, path };
+        return { status, path: path.startsWith(prefix) ? path.slice(prefix.length) : path };
       });
 
     for (const c of changed) {
@@ -41,7 +43,7 @@ export function check(dir, opts = {}) {
     }
 
     if (changed.some((c) => c.path === "memory/notes.md")) {
-      const diff = git(dir, ["diff", "--unified=0", mergeBase, "HEAD", "--", "memory/notes.md"]);
+      const diff = git(dir, ["diff", "--unified=0", mergeBase, "HEAD", "--", "memory/notes.md"]); // pathspec is relative to dir
       const removed = diff.split("\n").filter((l) => l.startsWith("-") && !l.startsWith("---") && l.slice(1).trim());
       if (removed.length) problems.push(`memory/notes.md is append-only; this PR removes or rewrites ${removed.length} line(s). Add a new note that responds to the old one instead.`);
       else notes.push("memory/notes.md: additions only ✓");
