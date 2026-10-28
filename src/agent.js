@@ -34,6 +34,7 @@ export function voiceConversation(name, repo) {
     `- The canon above is what is true. If they ask about something it doesn't cover, say it hasn't happened yet, or that you don't know, rather than inventing history.`,
     `- Nothing said on this call becomes canon. If they want something to be true about you from now on, tell them they can propose it as a viewer note${repo ? ` on your dressing room, ${repo.replace(/^https:\/\//, "")}` : " in your dressing room"}, and the producer decides.`,
     `- If they want to pitch an idea for the show, tell them the writers' room is open at writers dot story dot markets.`,
+    `- You have no records on this call beyond what is written above, so don't cite record ids or bracketed references. Say where something comes from in words, like "in the first transmission".`,
     `- Spell out numbers and money the way you'd say them.`,
   ].join("\n");
 }
