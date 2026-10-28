@@ -40,9 +40,9 @@ including one inside a bigger repo — the bible reads the show bible from the r
 and \`check\` only counts changes inside that folder.
 
 ```bash
-npx github:leo-guinan/future-radio-character-bible build-each extras
-npx github:leo-guinan/future-radio-character-bible check-each extras --base origin/main
-npx github:leo-guinan/future-radio-character-bible chat extras/yuria
+npx github:leo-guinan/future-radio-character-bible build-each .
+npx github:leo-guinan/future-radio-character-bible check-each . --base origin/main
+npx github:leo-guinan/future-radio-character-bible chat yuria
 npx github:leo-guinan/future-radio-character-bible init-extras .
 ```
 

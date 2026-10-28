@@ -154,7 +154,7 @@ export function extrasTemplates(pkg = DEFAULT_PACKAGE) {
     "CONTRIBUTING.md": `# Shaping the extras
 
 Extras are Future Radio characters who keep turning up without a story of their own yet.
-Each lives in \`extras/<name>/\`: what we know, what we don't know yet, and every appearance.
+Each lives in a folder of their own here (\`yuria/\`, \`the-cat/\`): what we know, what we don't know yet, and every appearance.
 What you notice about them is how they get a story — and if enough people care about one,
 they get promoted to a dressing room of their own, history and all.
 
@@ -162,14 +162,14 @@ they get promoted to a dressing room of their own, history and all.
 
 \`\`\`bash
 git clone <this repo> && cd <this repo>
-npx ${pkg} chat extras/yuria
+npx ${pkg} chat yuria
 \`\`\`
 
 \`/propose <note>\` in the chat writes a viewer note into that extra's folder.
 
 ## Propose something
 
-- **A viewer note** — \`extras/<name>/memory/viewer-notes/YYYY-MM-DD-short-title.md\`:
+- **A viewer note** — \`<name>/memory/viewer-notes/YYYY-MM-DD-short-title.md\`:
 
   \`\`\`markdown
   ---
@@ -197,7 +197,7 @@ A check runs on every pull request, once per extra the PR touches, and explains 
 `,
     ".github/pull_request_template.md": `## Which extra?
 
-<!-- extras/yuria, extras/the-cat, ... or a new one -->
+<!-- yuria, the-cat, ... or a new one -->
 
 ## What did you experience?
 
@@ -269,7 +269,7 @@ jobs:
         with: { fetch-depth: 0 }
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
-      - run: npx --yes ${pkg} check-each extras --base origin/\${{ github.base_ref }}
+      - run: npx --yes ${pkg} check-each . --base origin/\${{ github.base_ref }}
   rebuild:
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
@@ -278,11 +278,11 @@ jobs:
         with: { fetch-depth: 0 }
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
-      - run: npx --yes ${pkg} build-each extras
+      - run: npx --yes ${pkg} build-each .
       - run: |
           git config user.name "character-bible"
           git config user.email "bible@future.radio"
-          git add extras
+          git add -A -- '*/bible'
           git diff --cached --quiet || (git commit -m "Rebuild the extras' character bibles" && git push)
 `,
   };

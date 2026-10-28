@@ -17,7 +17,7 @@ const HELP = `character-bible — load a Future Radio character from their dress
   chat <dir> [--from name]        Talk with the character locally; /propose turns a moment into a viewer note
   show <dir>                      Print the system prompt (paste it into any model)
   init-github <dir> [--package spec] [--force]  Add CONTRIBUTING, PR template, issue form, CI workflow
-  build-each <dir>                 Build the bible of every character folder under <dir> (a shared repo, e.g. extras/)
+  build-each <dir>                 Build the bible of every character folder under <dir> (a shared repo of character folders)
   check-each <dir> [--base ref]    Check every character folder under <dir>
   init-extras <repo> [--package spec] [--force]  Scaffolding for a shared repo of character folders
 `;
