@@ -96,7 +96,11 @@ function sections(md) {
 const firstSentences = (t, n = 2) => (t ?? "").replace(/\s+/g, " ").trim().split(/(?<=[.!?])\s+/).slice(0, n).join(" ");
 
 /** Summarize the record: what the character has done, from history. */
-function record(runs) {
+const isAppearance = (r) => r.model === "released";
+
+function record(allRuns) {
+  const runs = allRuns.filter((r) => !isAppearance(r));
+  const appearances = allRuns.filter(isAppearance).map((r) => ({ id: r.runId, episode: r.episodeId ?? null, at: r.at?.slice(0, 10) ?? null, file: r.file }));
   const ideas = new Map();
   const episodes = new Map();
   const askers = new Set();
@@ -112,15 +116,23 @@ function record(runs) {
     ideas: [...ideas.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([id, n]) => ({ id, runs: n })),
     episodes: [...episodes.entries()].sort().map(([id, n]) => ({ id, runs: n })),
     patronsServed: askers.size,
+    appearances,
   };
 }
 
 /** Lines the character has actually spoken with a model behind them (not offline fallbacks). */
 function voiceSamples(runs, k = 8) {
-  return runs
-    .filter((r) => r.model !== "offline" && r.model !== "unknown" && !r.flagged && r.text)
-    .slice(-k)
-    .map((r) => ({ line: firstSentences(r.text, 2), source: r.file, idea: r.ideaId ?? null, at: r.at?.slice(0, 10) ?? null }));
+  const spoken = runs.filter((r) => r.model !== "offline" && r.model !== "unknown" && !r.flagged && r.text);
+  // Released lines are the strongest evidence of a voice: always keep them, then the latest model runs.
+  const released = spoken.filter(isAppearance);
+  const rest = spoken.filter((r) => !isAppearance(r)).slice(-(Math.max(0, k - released.length)));
+  return [...released, ...rest].map((r) => ({
+    line: firstSentences(r.text, 2),
+    source: r.file,
+    idea: r.ideaId ?? null,
+    episode: isAppearance(r) ? r.episodeId ?? null : null,
+    at: r.at?.slice(0, 10) ?? null,
+  }));
 }
 
 function relationships(src, self) {
@@ -186,13 +198,14 @@ export function renderBible(m) {
   for (const v of m.canon.viewerNotes) lines.push(`- ${v.note.split("\n")[0]} — _from ${v.from}${v.episode ? `, after ${v.episode}` : ""}_ (\`${v.file}\`)`);
   lines.push("", "## How they've sounded", "");
   if (!m.voice.samples.length) lines.push("_No recorded lines yet — so far the character has only run offline._");
-  for (const v of m.voice.samples) lines.push(`> ${v.line}`, `> — ${v.at}${v.idea ? `, on ${v.idea}` : ""} (\`${v.source}\`)`, "");
+  for (const v of m.voice.samples) lines.push(`> ${v.line}`, `> — ${v.episode ? `${v.episode}, as released` : v.at}${v.idea ? `, on ${v.idea}` : ""} (\`${v.source}\`)`, "");
   if (m.voice.settings?.voice) lines.push("", `Production voice: ${m.voice.settings.provider ?? "?"} · ${m.voice.settings.voice}`);
   const r = m.record;
   lines.push(
     "",
     "## The record",
     "",
+    `- Released appearances: ${r.appearances.length ? r.appearances.map((a) => `**${a.episode}** (\`${a.file}\`)`).join(", ") : "none yet"}`,
     `- Runs in the writers' room: **${r.runs}**${r.firstSeen ? ` (${r.firstSeen} → ${r.lastSeen})` : ""}`,
     `- Episodes: ${r.episodes.map((e) => `${e.id} (${e.runs})`).join(", ") || "none yet"}`,
     `- Ideas worked on: ${r.ideas.slice(0, 12).map((i) => `${i.id} (${i.runs})`).join(", ") || "none yet"}${r.ideas.length > 12 ? ` and ${r.ideas.length - 12} more` : ""}`,
@@ -229,7 +242,7 @@ export function renderSystemPrompt(m, showBible) {
       ? `## Canon — what is true about you\n\n${[...m.canon.notes.map((n) => `- ${n}`), ...m.canon.viewerNotes.map((v) => `- ${v.note.split("\n")[0]}`)].join("\n")}\n`
       : "",
     m.voice.samples.length ? `## How you have sounded\n\n${m.voice.samples.map((v) => `- "${v.line}"`).join("\n")}\n` : "",
-    `## What you have done\n\nYou have worked ${m.record.runs} time(s) in the writers' room${m.record.ideas.length ? `, on ideas ${m.record.ideas.slice(0, 8).map((i) => i.id).join(", ")}` : ""}.\n`,
+    `## What you have done\n\n${m.record.appearances.length ? `You have appeared in ${m.record.appearances.map((a) => a.episode).join(", ")}. ` : ""}You have worked ${m.record.runs} time(s) in the writers' room${m.record.ideas.length ? `, on ideas ${m.record.ideas.slice(0, 8).map((i) => i.id).join(", ")}` : ""}.\n`,
     `## This conversation\n\nYou are talking with a viewer outside the writers' room. Stay in character. The canon above is what is true; anything not in it hasn't happened yet — say so rather than inventing history. Nothing said here becomes canon unless the viewer proposes it as a pull request to your dressing room and the producer merges it. Keep replies short enough to be spoken aloud.`,
     "",
   ]

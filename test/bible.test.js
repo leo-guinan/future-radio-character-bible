@@ -122,3 +122,19 @@ test("with a key, the character speaks through the model with its system prompt"
   assert.equal(t, "The library is open.");
   assert.match(sent.system, /You are Borges/);
 });
+
+test("released appearances are the voice of record and are counted apart from runs", () => {
+  const dir = dressingRoom();
+  const entry = { runId: "E01-v1", at: "2026-10-27T15:34:38Z", episodeId: "E01", askedBy: "released", eventId: "ev_000090", eventHash: "cc", file: "history/appearances/E01-v1.md", text: "I have nothing but time. An unfortunate reader. In a library." };
+  w(dir, entry.file, "---\nrun: E01-v1\nmodel: released\n---\n\n- I have nothing but time.\n");
+  appendFileSync(join(dir, "history.jsonl"), JSON.stringify(entry) + "\n");
+  const { model } = build(dir);
+  assert.equal(model.record.runs, 2);
+  assert.deepEqual(model.record.appearances.map((a) => a.episode), ["E01"]);
+  assert.equal(model.voice.samples[0].line, "I have nothing but time. An unfortunate reader.");
+  assert.equal(model.voice.samples[0].episode, "E01");
+  const bible = readFileSync(join(dir, "bible/BIBLE.md"), "utf8");
+  assert.match(bible, /Released appearances: \*\*E01\*\*/);
+  assert.match(bible, /E01, as released/);
+  assert.match(readFileSync(join(dir, "bible/system-prompt.md"), "utf8"), /You have appeared in E01/);
+});
