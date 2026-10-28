@@ -101,7 +101,9 @@ export function load(dir) {
     return { ...entry, model: meta.model ?? "unknown", flagged: !!meta.flags };
   });
   const changelog = gitLog(dir, ["CHARACTER.md", "memory", "voice"]);
-  return { dir, name, slug, character, showBible: showBibleFor(dir), notes, viewerNotes, voice, runs, changelog };
+  let agent = null;
+  try { agent = JSON.parse(read(dir, "voice/agent.json") ?? "null"); } catch { agent = null; }
+  return { dir, name, slug, character, showBible: showBibleFor(dir), notes, viewerNotes, voice, agent, runs, changelog };
 }
 
 /** Sections of CHARACTER.md by "## " heading. */
@@ -175,6 +177,7 @@ export function model(input) {
     "memory/notes.md": sha256(input.notes.join("\n")),
     "memory/viewer-notes": sha256(JSON.stringify(input.viewerNotes)),
     "voice/voice.json": sha256(JSON.stringify(input.voice)),
+    "voice/agent.json": sha256(JSON.stringify(input.agent ?? null)),
     "history.jsonl": sha256(JSON.stringify(input.runs.map((r) => [r.runId, r.eventHash]))),
     changelog: sha256(JSON.stringify(input.changelog)),
   };
@@ -186,7 +189,7 @@ export function model(input) {
     inputs,
     identity: { intro: s.intro, job: s.parts["job"] ?? "", constraints: s.parts["hard constraints"] ?? "", conflict: s.parts["recurring conflict"] ?? "", other: Object.fromEntries(Object.entries(s.parts).filter(([k]) => !["job", "hard constraints", "recurring conflict"].includes(k))) },
     canon: { notes: input.notes, viewerNotes: input.viewerNotes },
-    voice: { settings: input.voice, samples: voiceSamples(input.runs) },
+    voice: { settings: input.voice, samples: voiceSamples(input.runs), agent: input.agent?.elevenlabs?.agentId ? { provider: "elevenlabs", agentId: input.agent.elevenlabs.agentId } : null },
     record: record(input.runs),
     relationships: relationships(allText, input.name),
     changelog: input.changelog.slice(0, 30),
@@ -213,7 +216,9 @@ export function renderBible(m) {
   lines.push("", "## How they've sounded", "");
   if (!m.voice.samples.length) lines.push("_No recorded lines yet — so far the character has only run offline._");
   for (const v of m.voice.samples) lines.push(`> ${v.line}`, `> — ${v.episode ? `${v.episode}, as released` : v.at}${v.idea ? `, on ${v.idea}` : ""} (\`${v.source}\`)`, "");
-  if (m.voice.settings?.voice) lines.push("", `Production voice: ${m.voice.settings.provider ?? "?"} · ${m.voice.settings.voice}`);
+  const voiceName = m.voice.settings?.voice ?? m.voice.settings?.name;
+  if (voiceName) lines.push("", `Production voice: ${m.voice.settings.provider ?? "?"} · ${voiceName}`);
+  if (m.voice.agent) lines.push("", `Talk with ${m.name} by voice: https://elevenlabs.io/app/talk-to?agent_id=${m.voice.agent.agentId}`);
   const r = m.record;
   lines.push(
     "",
@@ -242,7 +247,9 @@ export function renderBible(m) {
   return lines.join("\n");
 }
 
-export function renderSystemPrompt(m, showBible) {
+const TEXT_CONVERSATION = "You are talking with a viewer outside the writers' room. Stay in character. The canon above is what is true; anything not in it hasn't happened yet — say so rather than inventing history. Nothing said here becomes canon unless the viewer proposes it as a pull request to your dressing room and the producer merges it. Keep replies short enough to be spoken aloud.";
+
+export function renderSystemPrompt(m, showBible, { conversation = TEXT_CONVERSATION } = {}) {
   const id = m.identity;
   return [
     `You are ${m.name}, a character in Future Radio.`,
@@ -257,7 +264,7 @@ export function renderSystemPrompt(m, showBible) {
       : "",
     m.voice.samples.length ? `## How you have sounded\n\n${m.voice.samples.map((v) => `- "${v.line}"`).join("\n")}\n` : "",
     `## What you have done\n\n${m.record.appearances.length ? `You have appeared in ${m.record.appearances.map((a) => a.episode).join(", ")}. ` : ""}You have worked ${m.record.runs} time(s) in the writers' room${m.record.ideas.length ? `, on ideas ${m.record.ideas.slice(0, 8).map((i) => i.id).join(", ")}` : ""}.\n`,
-    `## This conversation\n\nYou are talking with a viewer outside the writers' room. Stay in character. The canon above is what is true; anything not in it hasn't happened yet — say so rather than inventing history. Nothing said here becomes canon unless the viewer proposes it as a pull request to your dressing room and the producer merges it. Keep replies short enough to be spoken aloud.`,
+    `## This conversation\n\n${conversation}`,
     "",
   ]
     .filter(Boolean)

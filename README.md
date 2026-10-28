@@ -33,6 +33,29 @@ last few lines of the conversation — ready to commit and open as a pull reques
 Without an API key the character answers offline, straight from their bible.
 `CHARACTER_MODEL` picks the model (default `claude-sonnet-5-5`).
 
+## Voice agents
+
+Every bible can also become a voice agent: the same persona, canon and record, with a prompt
+written for talking out loud, in the character's production voice.
+
+```bash
+npx github:leo-guinan/future-radio-character-bible agent .            # the agent as JSON
+npx github:leo-guinan/future-radio-character-bible agent . --prompt   # just the spoken prompt
+ELEVENLABS_API_KEY=... npx github:leo-guinan/future-radio-character-bible agent . --publish
+```
+
+`--publish` creates an ElevenLabs agent the first time and saves its id in
+`voice/agent.json`; after that it updates the same agent with the rebuilt prompt. The voice
+comes from `voice/voice.json` (`"provider": "elevenlabs"`, `"id": "<voice id>"`). Tune the agent
+in `voice/agent.json`:
+
+```json
+{ "firstMessage": "Ledger's open.", "llm": "claude-sonnet-5-5", "temperature": 0.7, "language": "en" }
+```
+
+Once a dressing room has an agent, its bible links to it. What's said on a call never becomes
+canon; the agent tells callers how to propose a viewer note instead.
+
 ## Shared repos (extras)
 
 A character doesn't need a repo of their own. Any folder with a \`CHARACTER.md\` works,

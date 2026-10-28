@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // character-bible build|check|chat|init-github|show <dressing-room-dir>
 
-import { build, characterFolders, check, initExtrasGithub, initGithub, render, repl } from "../src/index.js";
+import { build, characterFolders, check, initExtrasGithub, initGithub, publishAgent, render, renderAgent, repl } from "../src/index.js";
 import { relative } from "node:path";
 
 const [cmd, dir = ".", ...rest] = process.argv.slice(2);
@@ -16,6 +16,8 @@ const HELP = `character-bible — load a Future Radio character from their dress
   check <dir> [--base origin/main]  Verify the bible is fresh; with --base, apply pull-request rules
   chat <dir> [--from name]        Talk with the character locally; /propose turns a moment into a viewer note
   show <dir>                      Print the system prompt (paste it into any model)
+  agent <dir> [--prompt]          Print the character as a voice agent (JSON), or just its spoken prompt
+  agent <dir> --publish [--new]   Create the ElevenLabs agent, or update the one voice/agent.json names (needs ELEVENLABS_API_KEY)
   init-github <dir> [--package spec] [--force]  Add CONTRIBUTING, PR template, issue form, CI workflow
   build-each <dir>                 Build the bible of every character folder under <dir> (a shared repo of character folders)
   check-each <dir> [--base ref]    Check every character folder under <dir>
@@ -64,6 +66,16 @@ try {
     case "chat":
       await repl(dir, { from: flag("from") });
       break;
+    case "agent": {
+      if (flag("publish")) {
+        const r = await publishAgent(dir, { create: !!flag("new") });
+        console.log(`${r.created ? "Created" : "Updated"} agent ${r.agentId}${r.created ? " (saved in voice/agent.json — commit it)" : ""}.`);
+        break;
+      }
+      const a = renderAgent(dir);
+      process.stdout.write(flag("prompt") ? a.prompt : JSON.stringify(a, null, 2) + "\n");
+      break;
+    }
     case "show":
       process.stdout.write(render(dir).files["bible/system-prompt.md"]);
       break;
