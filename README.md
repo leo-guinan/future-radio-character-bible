@@ -71,3 +71,5 @@ import { build, check, loadCharacter, reply, propose } from "future-radio-charac
 Zero dependencies. Node 20+.
 
 Part of [Future Radio](https://github.com/leo-guinan/future-radio-writers-room), made in public.
+
+License: [CC0 1.0](LICENSE). Public domain; use it, change it, ship it.

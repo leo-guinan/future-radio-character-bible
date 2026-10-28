@@ -22,5 +22,5 @@
   "scripts": {
     "test": "node --test test/*.test.js"
   },
-  "license": "MIT"
+  "license": "CC0-1.0"
 }
