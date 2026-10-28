@@ -19,11 +19,11 @@ so a stale or hand-edited bible is detectable.
 ## Use
 
 ```bash
-npx future-radio-character-bible build ./dressing-room-borges
-npx future-radio-character-bible chat  ./dressing-room-borges     # ANTHROPIC_API_KEY optional
-npx future-radio-character-bible show  ./dressing-room-borges     # print the system prompt
-npx future-radio-character-bible check ./dressing-room-borges --base origin/main
-npx future-radio-character-bible init-github ./dressing-room-borges --package github:OWNER/future-radio-character-bible
+npx github:leo-guinan/future-radio-character-bible build ./dressing-room-borges
+npx github:leo-guinan/future-radio-character-bible chat  ./dressing-room-borges     # ANTHROPIC_API_KEY optional
+npx github:leo-guinan/future-radio-character-bible show  ./dressing-room-borges     # print the system prompt
+npx github:leo-guinan/future-radio-character-bible check ./dressing-room-borges --base origin/main
+npx github:leo-guinan/future-radio-character-bible init-github ./dressing-room-borges --package github:leo-guinan/future-radio-character-bible
 ```
 
 In `chat`, type `/propose <what should be true about them>` and the moment becomes a viewer
@@ -49,6 +49,9 @@ the bible on every push to `main`.
 
 ```js
 import { build, check, loadCharacter, reply, propose } from "future-radio-character-bible";
+// npm install github:leo-guinan/future-radio-character-bible
 ```
 
 Zero dependencies. Node 20+.
+
+Part of [Future Radio](https://github.com/leo-guinan/future-radio-writers-room), made in public.

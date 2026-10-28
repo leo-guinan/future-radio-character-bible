@@ -19,6 +19,8 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 
 import { basename, join, resolve } from "node:path";
 
 export const BIBLE_VERSION = 1;
+/** Where this tool lives; used in the instructions written into every bible. */
+export const PACKAGE = "github:leo-guinan/future-radio-character-bible";
 const CAST = ["Borges", "Leonardo", "Agnolo", "Yuria", "Showrunner", "Patron"];
 
 const sha256 = (s) => createHash("sha256").update(s).digest("hex");
@@ -206,7 +208,7 @@ export function renderBible(m) {
     "",
     "---",
     "",
-    "Talk to this character locally: `npx future-radio-character-bible chat .`",
+    `Talk to this character locally: \`npx ${PACKAGE} chat .\``,
     "Something about them doesn't ring true after an episode? Open a pull request — see CONTRIBUTING.md.",
     "",
   );

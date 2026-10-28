@@ -2,9 +2,9 @@
 
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { load } from "./bible.js";
+import { load, PACKAGE } from "./bible.js";
 
-export const DEFAULT_PACKAGE = process.env.CHARACTER_BIBLE_PACKAGE ?? "github:OWNER/future-radio-character-bible";
+export const DEFAULT_PACKAGE = process.env.CHARACTER_BIBLE_PACKAGE ?? PACKAGE;
 
 export function templates(name, pkg = DEFAULT_PACKAGE) {
   return {
