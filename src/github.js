@@ -282,7 +282,7 @@ jobs:
       - run: |
           git config user.name "character-bible"
           git config user.email "bible@future.radio"
-          git add -A -- '*/bible'
+          git add -A
           git diff --cached --quiet || (git commit -m "Rebuild the extras' character bibles" && git push)
 `,
   };
